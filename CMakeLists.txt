@@ -19,9 +19,7 @@ include_directories(${CMAKE_SOURCE_DIR})
 include_directories(${SDL2_DIR}/include/SDL2/)
 
 # 动态链接库或静态链接库的搜索路径
-link_directories(${FFMPEG_DIR}/lib/)
-
-link_directories(${SDL2_DIR}/lib/)
+link_directories(${FFMPEG_DIR}/lib/ ${SDL2_DIR}/lib/)
 
 #将指定文件设置在FFmpeg_debug_source变量中
 file(GLOB FFplay_debug_source ${CMAKE_SOURCE_DIR}/*.*)
