@@ -1598,6 +1598,9 @@ static void video_refresh(void *opaque, double *remaining_time) {
                 if (!is->step && (framedrop > 0 || (framedrop && get_master_sync_type(is) != AV_SYNC_VIDEO_MASTER)) &&
                     time > is->frame_timer + duration) {
                     is->frame_drops_late++;
+
+                    printf("%s -- %d count : %d\n", __func__, __LINE__, is->frame_drops_late);
+
                     frame_queue_next(&is->pictq);
                     goto retry;
                 }
@@ -1677,8 +1680,9 @@ static void video_refresh(void *opaque, double *remaining_time) {
 
             av_bprint_init(&buf, 0, AV_BPRINT_SIZE_AUTOMATIC);
             av_bprintf(&buf,
-                       "%7.2f %s:%7.3f fd=%4d aq=%5dKB vq=%5dKB sq=%5dB f=%"PRId64"/%"PRId64"   \r",
+                       "%7.4f %7.4f %s:%7.3f fd=%4d aq=%5dKB vq=%5dKB sq=%5dB f=%"PRId64"/%"PRId64"   \n",
                        get_master_clock(is),
+                       get_clock(&is->vidclk),
                        (is->audio_st && is->video_st) ? "A-V" : (is->video_st ? "M-V" : (is->audio_st ? "M-A" : "   ")),
                        av_diff,
                        is->frame_drops_early + is->frame_drops_late,
@@ -1741,18 +1745,30 @@ static int get_video_frame(VideoState *is, AVFrame *frame) {
         double dpts = NAN;
 
         if (frame->pts != AV_NOPTS_VALUE)
+            ///计算出秒为单位的pts
             dpts = av_q2d(is->video_st->time_base) * frame->pts;
 
         frame->sample_aspect_ratio = av_guess_sample_aspect_ratio(is->ic, is->video_st, frame);
 
+        /// framedrop，为1，则始终判断是否丢帧；
+        /// 为0，则始终不丢帧；
+        /// 为-1（默认值），则在主时钟不是video的时候，判断是否丢帧。
         if (framedrop > 0 || (framedrop && get_master_sync_type(is) != AV_SYNC_VIDEO_MASTER)) {
             if (frame->pts != AV_NOPTS_VALUE) {
+
+                ///  dpts 视频帧的显示时间
+                ///  get_master_clock(is) 主时钟（音频）
+                ///  视频慢了 diff < 0 为什么要丢帧 丢帧的逻辑没看懂 ？？？
+
                 double diff = dpts - get_master_clock(is);
                 if (!isnan(diff) && fabs(diff) < AV_NOSYNC_THRESHOLD &&
                     diff - is->frame_last_filter_delay < 0 &&
                     is->viddec.pkt_serial == is->vidclk.serial &&
                     is->videoq.nb_packets) {
                     is->frame_drops_early++;
+
+                    printf("%s -- %d count : %d\n", __func__, __LINE__, is->frame_drops_early);
+
                     av_frame_unref(frame);
                     got_picture = 0;
                 }
