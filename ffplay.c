@@ -1758,7 +1758,7 @@ static int get_video_frame(VideoState *is, AVFrame *frame) {
 
                 ///  dpts 视频帧的显示时间
                 ///  get_master_clock(is) 主时钟（音频）
-                ///  视频慢了 diff < 0 为什么要丢帧 丢帧的逻辑没看懂 ？？？
+                ///  视频慢了 diff < 0 为什么要丢帧呢  ？？？
 
                 double diff = dpts - get_master_clock(is);
                 if (!isnan(diff) && fabs(diff) < AV_NOSYNC_THRESHOLD &&
@@ -2039,11 +2039,12 @@ static int audio_thread(void *arg) {
                     is->audio_filter_src.freq != frame->sample_rate ||
                     is->auddec.pkt_serial != last_serial;
 
+            /// configure_audio_filters 只做一次？
             if (reconfigure) {
                 char buf1[1024], buf2[1024];
                 av_get_channel_layout_string(buf1, sizeof(buf1), -1, is->audio_filter_src.channel_layout);
                 av_get_channel_layout_string(buf2, sizeof(buf2), -1, dec_channel_layout);
-                av_log(NULL, AV_LOG_DEBUG,
+                av_log(NULL, AV_LOG_INFO,
                        "Audio frame changed from rate:%d ch:%d fmt:%s layout:%s serial:%d to rate:%d ch:%d fmt:%s layout:%s serial:%d\n",
                        is->audio_filter_src.freq, is->audio_filter_src.channels,
                        av_get_sample_fmt_name(is->audio_filter_src.fmt), buf1, last_serial,
@@ -2060,12 +2061,18 @@ static int audio_thread(void *arg) {
                     goto the_end;
             }
 
+            /// 对 frame 做重采样
             if ((ret = av_buffersrc_add_frame(is->in_audio_filter, frame)) < 0)
                 goto the_end;
 
             while ((ret = av_buffersink_get_frame_flags(is->out_audio_filter, frame, 0)) >= 0) {
                 tb = av_buffersink_get_time_base(is->out_audio_filter);
 #endif
+                /// 音频帧的处理逻辑 跟 视频帧不一样
+                /// 视频帧 使用了queue_picture()方法包装了一下
+                /// queue_picture() 内部 也是 通过 frame_queue_peek_writable() && frame_queue_push() 处理的
+                /// 也可以搞个 queue_sample() 处理下音频帧 统一下
+
                 if (!(af = frame_queue_peek_writable(&is->sampq)))
                     goto the_end;
 
@@ -2311,6 +2318,9 @@ static int synchronize_audio(VideoState *is, int nb_samples) {
  * stored in is->audio_buf, with size in bytes given by the return
  * value.
  */
+
+/// 这个方法并不做解码 解码逻辑 在 audio_thread() -> decoder_decode_frame()
+
 static int audio_decode_frame(VideoState *is) {
     int data_size, resampled_data_size;
     int64_t dec_channel_layout;
@@ -2334,6 +2344,7 @@ static int audio_decode_frame(VideoState *is) {
         frame_queue_next(&is->sampq);
     } while (af->serial != is->audioq.serial);
 
+    /// 1024（nb_samples） * 2（channels） * 2（format AV_SAMPLE_FMT_S16 byte） = 4096
     data_size = av_samples_get_buffer_size(NULL, af->frame->channels,
                                            af->frame->nb_samples,
                                            af->frame->format, 1);
