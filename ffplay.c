@@ -2359,6 +2359,9 @@ static int audio_decode_frame(VideoState *is) {
         dec_channel_layout != is->audio_src.channel_layout ||
         af->frame->sample_rate != is->audio_src.freq ||
         (wanted_nb_samples != af->frame->nb_samples && !is->swr_ctx)) {
+
+        /// 什么情况 还会进来 再次重采样？
+
         swr_free(&is->swr_ctx);
         is->swr_ctx = swr_alloc_set_opts(NULL,
                                          is->audio_tgt.channel_layout, is->audio_tgt.fmt, is->audio_tgt.freq,
@@ -2473,6 +2476,7 @@ static void sdl_audio_callback(void *opaque, Uint8 *stream, int len) {
     }
     is->audio_write_buf_size = is->audio_buf_size - is->audio_buf_index;
     /* Let's assume the audio driver that is used by SDL has two periods. */
+    /// https://www.xianwaizhiyin.net/?p=474 这篇文章帮忙理解
     if (!isnan(is->audio_clock)) {
         set_clock_at(&is->audclk, is->audio_clock - (double) (2 * is->audio_hw_buf_size + is->audio_write_buf_size) /
                                                     is->audio_tgt.bytes_per_sec, is->audio_clock_serial,
