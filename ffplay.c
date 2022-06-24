@@ -1927,6 +1927,8 @@ static int configure_video_filters(AVFilterGraph *graph, VideoState *is, const c
     return ret;
 }
 
+/// ffmpeg 滤波器 https://www.cnblogs.com/TaigaCon/p/10067871.html
+
 static int configure_audio_filters(VideoState *is, const char *afilters, int force_output_format) {
     static const enum AVSampleFormat sample_fmts[] = {AV_SAMPLE_FMT_S16, AV_SAMPLE_FMT_NONE};
     int sample_rates[2] = {0, -1};
@@ -2061,7 +2063,7 @@ static int audio_thread(void *arg) {
                     goto the_end;
             }
 
-            /// 对 frame 做重采样
+            /// 通过 avfilter 滤波器 对 frame 做重采样
             if ((ret = av_buffersrc_add_frame(is->in_audio_filter, frame)) < 0)
                 goto the_end;
 
@@ -2360,6 +2362,7 @@ static int audio_decode_frame(VideoState *is) {
         af->frame->sample_rate != is->audio_src.freq ||
         (wanted_nb_samples != af->frame->nb_samples && !is->swr_ctx)) {
 
+        /// audio_thread 中 通过 avfilter 滤波器 做过重采样了，这里再次检查下是否还需要做重采样（通过 swresample）
         /// 什么情况 还会进来 再次重采样？
 
         swr_free(&is->swr_ctx);
