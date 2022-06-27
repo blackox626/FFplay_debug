@@ -1816,7 +1816,12 @@ static int configure_filtergraph(AVFilterGraph *graph, const char *filtergraph,
     for (i = 0; i < graph->nb_filters - nb_filters; i++)
         FFSWAP(AVFilterContext*, graph->filters[i], graph->filters[i + nb_filters]);
 
+    /// 滤波格式协商  https://www.cnblogs.com/TaigaCon/p/10111326.html
     ret = avfilter_graph_config(graph, NULL);
+
+    /// 音频 swresample  视频 swscale
+    for (i = 0; i < graph->nb_filters; i++)
+        printf("%s -- %d count : %s\n", __func__, __LINE__, graph->filters[i]->name);
     fail:
     avfilter_inout_free(&outputs);
     avfilter_inout_free(&inputs);
