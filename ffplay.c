@@ -2369,6 +2369,7 @@ static int audio_decode_frame(VideoState *is) {
 
         /// audio_thread 中 通过 avfilter 滤波器 做过重采样了，这里再次检查下是否还需要做重采样（通过 swresample）
         /// 什么情况 还会进来 再次重采样？
+        /// 答案 ：如果是视频做主时钟，音频向视频靠齐，synchronize_audio（）方法 会增加或减少样本数，wanted_nb_samples != af->frame->nb_samples ，所以再次做重采样
 
         swr_free(&is->swr_ctx);
         is->swr_ctx = swr_alloc_set_opts(NULL,
