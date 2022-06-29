@@ -655,6 +655,20 @@ static int decoder_decode_frame(Decoder *d, AVFrame *frame, AVSubtitle *sub) {
             }
             av_packet_unref(d->pkt);
         } else {
+
+            /// https://blog.csdn.net/leixiaohua1020/article/details/11800877
+            /// 这里需要注意一下，一般的mp4读出来的的packet是不带start code的，需要手动加上，如果是ts的话则是带上了start code的
+            if (d->avctx->codec_type == AVMEDIA_TYPE_VIDEO) {
+                if (d->pkt->buf && d->pkt->buf->data) {
+                    uint8_t cNalu = d->pkt->buf->data[4];
+                    uint8_t type = (cNalu & 0x1f);
+
+                    printf("%s -- %d count : %d %d %d %d %d %d\n", __func__, __LINE__, d->pkt->buf->data[0],
+                           d->pkt->buf->data[1],
+                           d->pkt->buf->data[2], d->pkt->buf->data[3], d->pkt->buf->data[4], type);
+                }
+            }
+
             if (avcodec_send_packet(d->avctx, d->pkt) == AVERROR(EAGAIN)) {
                 av_log(d->avctx, AV_LOG_ERROR,
                        "Receive_frame and send_packet both returned EAGAIN, which is an API violation.\n");
@@ -2596,6 +2610,8 @@ static int stream_component_open(VideoState *is, int stream_index) {
         goto fail;
     avctx->pkt_timebase = ic->streams[stream_index]->time_base;
 
+    printf("%s -- %d, gop_size : %d\n", __func__, __LINE__, avctx->gop_size);
+
     codec = avcodec_find_decoder(avctx->codec_id);
 
     switch (avctx->codec_type) {
@@ -3065,6 +3081,15 @@ static int read_thread(void *arg) {
         } else if (pkt->stream_index == is->video_stream && pkt_in_play_range
                    && !(is->video_st->disposition & AV_DISPOSITION_ATTACHED_PIC)) {
             packet_queue_put(&is->videoq, pkt);
+
+//            if (pkt->buf && pkt->buf->data) {
+//                uint8_t cNalu = pkt->buf->data[4];
+//                uint8_t type = (cNalu & 0x1f);
+//
+//                printf("%s -- %d count : %d %d %d %d %d %d\n", __func__, __LINE__, pkt->buf->data[0], pkt->buf->data[1],
+//                       pkt->buf->data[2], pkt->buf->data[3], pkt->buf->data[4], type);
+//            }
+
         } else if (pkt->stream_index == is->subtitle_stream && pkt_in_play_range) {
             packet_queue_put(&is->subtitleq, pkt);
         } else {
