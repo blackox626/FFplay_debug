@@ -657,15 +657,29 @@ static int decoder_decode_frame(Decoder *d, AVFrame *frame, AVSubtitle *sub) {
         } else {
 
             /// https://blog.csdn.net/leixiaohua1020/article/details/11800877
-            /// 这里需要注意一下，一般的mp4读出来的的packet是不带start code的，需要手动加上，如果是ts的话则是带上了start code的
+            /// 这里需要注意一下，一般的mp4读出来的的avpacket是不带start code的，需要手动加上，如果是ts的话则是带上了start code的
+            /// mp4读出来的的avpacket 前四个字节表示当前NALU的大小
             if (d->avctx->codec_type == AVMEDIA_TYPE_VIDEO) {
                 if (d->pkt->buf && d->pkt->buf->data) {
                     uint8_t cNalu = d->pkt->buf->data[4];
                     uint8_t type = (cNalu & 0x1f);
 
-                    printf("%s -- %d count : %d %d %d %d %d %d\n", __func__, __LINE__, d->pkt->buf->data[0],
+                    int naluSize = 0;
+
+                    /* 前四个字节表示当前NALU的大小 */
+                    for (int i = 0; i < 4; i++) {
+                        naluSize <<= 8;
+                        naluSize |= d->pkt->buf->data[i];
+                    }
+
+                    printf("%s -- %d count : %d %d %d %d %d type : %d size : %d\n", __func__, __LINE__,
+                           d->pkt->buf->data[0],
                            d->pkt->buf->data[1],
-                           d->pkt->buf->data[2], d->pkt->buf->data[3], d->pkt->buf->data[4], type);
+                           d->pkt->buf->data[2],
+                           d->pkt->buf->data[3],
+                           d->pkt->buf->data[4],
+                           type,
+                           naluSize);
                 }
             }
 
